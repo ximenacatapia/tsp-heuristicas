@@ -10,15 +10,7 @@
 // Crea una base de datos temporal con el mismo esquema que la real, la puebla
 // con los datos que se le den, y la borra al destruirse.
 //
-// Las pruebas NO deben depender de la base que entregue el profesor: esa
-// puede cambiar de un semestre a otro, y una prueba que afirme "la ciudad 1
-// se llama Tokyo" fallaría con datos nuevos aunque el código esté bien. Lo
-// que se quiere verificar es que la LECTURA funcione, no qué dice un archivo
-// en particular.
 //
-// Con una base construida aquí se controlan los valores exactos y además se
-// pueden fabricar casos que la base real no contiene: una ciudad sin
-// conexiones, un nombre con caracteres raros, coordenadas en los extremos.
 class TempDatabase
 {
 public:

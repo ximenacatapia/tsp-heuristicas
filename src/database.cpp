@@ -82,7 +82,7 @@ std::vector<City> Database::get_cities(
 // we the edges of two enpoints that are both in the instance
 std::vector<Connection> Database::get_connections(const std::vector<int> &ids) const
 {
-    std::set<int> wanted(ids.begin(), ids.end());
+    std::set<int> wanted(ids.begin(), ids.end()); // set to ask if the city belong to ids.
     sqlite3_stmt *stmt = nullptr;
 
     const char *sql = "SELECT id_city_1, id_city_2, distance FROM connections";
@@ -109,6 +109,7 @@ std::vector<Connection> Database::get_connections(const std::vector<int> &ids) c
     return connections;
 }
 
+// Cuenta el total de ciudades en la base.
 int Database::count_cities() const
 {
     sqlite3_stmt *stmt = nullptr;
@@ -127,6 +128,7 @@ int Database::count_cities() const
     return total;
 }
 
+// Cuenta el total de conexiones en la base.
 int Database::count_connections() const
 {
     sqlite3_stmt *stmt = nullptr;

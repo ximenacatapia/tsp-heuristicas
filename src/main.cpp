@@ -6,7 +6,7 @@
 #include <string>
 #include <vector>
 
-#include "database.hpp"
+#include "instance.hpp"
 #include "city.hpp"
 #include "reader.hpp"
 
@@ -35,11 +35,10 @@ namespace
     }
 }
 
-// whattt
+//
 int main(int argc, char *argv[])
 {
 
-    // whatttmain
     if (argc < 2 || argc > 3)
     {
         uso(argv[0]);
@@ -66,24 +65,28 @@ int main(int argc, char *argv[])
         // The destructor closes the connection when the block is left.
         Database db(db_path);
 
-        // cities[i] corresponds to ids[i].
-        std::vector<City> cities = db.get_cities(ids);
+        // construimos la fmatriz de costo, max_distance y el normalizador solo una vez
+        Instance instance(ids, db);
 
-        std::printf("  Filename: %s\n", base_name(tsp_path).c_str());
-        std::printf("    Cities: %zu\n\n", cities.size());
+        // The reference tour is the instance in the given order, i.e. indices
+        // 0..k-1. Later this comes from the heuristic; for now it lets the
+        // report reproduce the same numbers as the reference analyzer.
+        std::vector<std::size_t> tour(ids.size());
+        for (std::size_t i = 0; i < ids.size(); ++i)
+            tour[i] = i;
 
-        std::printf("%6s  %-22s %-22s %12s %12s\n", "id", "name", "country",
-                    "latitude", "longitude");
-        std::printf(
-            "--------------------------------------------------"
-            "----------------------------------\n");
-
-        for (const City &c : cities)
+        std::string path;
+        for (std::size_t i = 0; i < ids.size(); ++i)
         {
-            std::printf("%6d  %-22s %-22s %12.4f %12.4f\n", c.id,
-                        c.name.c_str(), c.country.c_str(), c.latitude,
-                        c.longitude);
+            if (i > 0)
+                path += ',';
+            path += std::to_string(ids[i]);
         }
+        std::printf("  Filename: %s\n", base_name(tsp_path).c_str());
+        std::printf("      Path: %s\n", path.c_str());
+        std::printf("   Maximum: %.9f\n", instance.max_distance());
+        std::printf("Normalizer: %.9f\n", instance.normalizer());
+        std::printf("Evaluation: %.9f\n", instance.evaluate(tour));
     }
     catch (const std::exception &e)
     {
