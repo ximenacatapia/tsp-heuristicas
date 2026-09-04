@@ -7,52 +7,82 @@
 #include <vector>
 
 #include "database.hpp"
-#include "ciudad.hpp"
-#include "lector.hpp"
+#include "city.hpp"
+#include "reader.hpp"
 
+namespace
+{
+
+    const char *kDefaultDatabase = "tsp.db";
+    const char *kEnvVariable = "TSP_DB";
+
+    void uso(const char *program)
+    {
+        std::cerr << "Usage: " << program << " file.tsp [database.db]\n"
+                  << "\n"
+                  << "  file.tsp     instance to process\n"
+                  << "  database.db  path to the database\n"
+                  << "               (or the " << kEnvVariable
+                  << " environment variable; default: " << kDefaultDatabase
+                  << ")\n";
+    }
+
+    // returns the path without its directory
+    std::string base_name(const std::string &path)
+    {
+        std::size_t slash = path.find_last_of("/\\");
+        return (slash == std::string::npos) ? path : path.substr(slash + 1);
+    }
+}
+
+// whattt
 int main(int argc, char *argv[])
 {
-    //validamos argc, esperamos la ruta del .tsp y opcionalmente de la base
-    //si no se da la base, usamos tsp.db del directorio actual
+
+    // whatttmain
     if (argc < 2 || argc > 3)
     {
-        std::cerr << "Uso: " << argv[0] << " <archivo.tsp> [base.db]\n";
+        uso(argv[0]);
         return 1;
     }
 
-    const std::string ruta_tsp = argv[1];
-    const std::string ruta_db = (argc == 3) ? argv[2] : "tsp.db";
+    const std::string tsp_path = argv[1];
+
+    std::string db_path;
+    if (argc == 3)
+    {
+        db_path = argv[2];
+    }
+    else
+    {
+        const char *from_env = std::getenv(kEnvVariable);
+        db_path = (from_env != nullptr) ? from_env : kDefaultDatabase;
+    }
 
     try
     {
-        // leemos la instancia (Lector.cpp)
-        std::vector<int> ids = leer_instancia(ruta_tsp);
+        // The order of the ids is the tour: it must not be sorted.
+        std::vector<int> ids = read_instance(tsp_path);
+        // The destructor closes the connection when the block is left.
+        Database db(db_path);
 
-        // abrimos la base 
-        DataBase db(ruta_db);
-        //consultamos cada id de la base para ciudades
-        std::vector<Ciudad> ciudades = db.obtener_ciudades(ids);
+        // cities[i] corresponds to ids[i].
+        std::vector<City> cities = db.get_cities(ids);
 
-        // Nombre del archivo sin la ruta.
-        std::string nombre = ruta_tsp;
-        std::size_t diagonal = nombre.find_last_of("/\\");
-        if (diagonal != std::string::npos)
-            nombre = nombre.substr(diagonal + 1);
+        std::printf("  Filename: %s\n", base_name(tsp_path).c_str());
+        std::printf("    Cities: %zu\n\n", cities.size());
 
-        std::printf("  Archivo: %s\n", nombre.c_str());
-        std::printf(" Ciudades: %zu\n\n", ciudades.size());
-
-        std::printf("%6s  %-22s %-22s %12s %12s\n", "id", "nombre", "país",
-                    "latitud", "longitud");
+        std::printf("%6s  %-22s %-22s %12s %12s\n", "id", "name", "country",
+                    "latitude", "longitude");
         std::printf(
             "--------------------------------------------------"
             "----------------------------------\n");
 
-        for (const Ciudad &c : ciudades)
+        for (const City &c : cities)
         {
             std::printf("%6d  %-22s %-22s %12.4f %12.4f\n", c.id,
-                        c.nombre.c_str(), c.pais.c_str(), c.latitud,
-                        c.longitud);
+                        c.name.c_str(), c.country.c_str(), c.latitude,
+                        c.longitude);
         }
     }
     catch (const std::exception &e)
