@@ -1,0 +1,3 @@
+instance,seed,batch_size,cooling,epsilon,accept_percentage,initial_temperature,cost,feasible
+input-150.tsp,1,2000,0.95,0.0001,0.9,120576.000000000,33759.810531517,0
+input-150.tsp,2,2000,0.95,0.0001,0.9,122880.000000000,0.159154645,1

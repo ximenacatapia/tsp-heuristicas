@@ -30,8 +30,9 @@ void Instance::build_matrix(const std::vector<Connection> &connections)
     {
         std::size_t i = index_of_.at(e.c1);
         std::size_t j = index_of_.at(e.c2);
-        matrix_[i * k + j] = e.distance;
-        matrix_[j * k + i] = e.distance;
+        double nat = distance::natural(cities_[i], cities_[j]);
+        matrix_[i * k + j] = nat;
+        matrix_[j * k + i] = nat;
         real_[i * k + j] = 1;
         real_[j * k + i] = 1;
     }
@@ -100,9 +101,7 @@ void Instance::compute_max_and_normalizer()
 
 double Instance::evaluate(const std::vector<std::size_t> &tour) const
 {
-    // Sum the augmented weight of each consecutive pair. The tour is a path,
-    // not a cycle: it does not return from the last city to the first, so the
-    // loop runs from the second element (definition 4.3.2).
+    // Sum the augmented weight of each consecutive pair. The tour is a path not a cycle
     double sum = 0.0;
     for (std::size_t i = 1; i < tour.size(); ++i)
     {

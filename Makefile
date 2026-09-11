@@ -8,7 +8,7 @@ TEST_BIN := $(BUILD)/tests
 
 # Fuentes del sistema, sin main.cpp: el binario de pruebas las enlaza y no
 # puede tener dos funciones main.
-LIB_SRC   := $(filter-out src/main.cpp,$(wildcard src/*.cpp))
+LIB_SRC   := $(filter-out src/main.cpp,$(wildcard src/*.cpp src/heuristic/*.cpp))
 LIB_OBJ   := $(patsubst src/%.cpp,$(BUILD)/%.o,$(LIB_SRC))
 TEST_SRC  := $(wildcard tests/*.cpp)
 TEST_OBJ  := $(patsubst tests/%.cpp,$(BUILD)/%.o,$(TEST_SRC))
@@ -34,14 +34,14 @@ $(BIN): $(LIB_OBJ) $(BUILD)/main.o
 $(TEST_BIN): $(LIB_OBJ) $(TEST_OBJ)
 	$(CXX) $(CXXFLAGS) -o $@ $^ $(LDLIBS)
 
-$(BUILD)/%.o: src/%.cpp | $(BUILD)
+# Compiles any src/*.cpp or src/**/*.cpp, creating the object's subfolder.
+$(BUILD)/%.o: src/%.cpp
+	@mkdir -p $(dir $@)
 	$(CXX) $(CXXFLAGS) -c -o $@ $<
 
-$(BUILD)/%.o: tests/%.cpp | $(BUILD)
+$(BUILD)/%.o: tests/%.cpp
+	@mkdir -p $(dir $@)
 	$(CXX) $(CXXFLAGS) -c -o $@ $<
-
-$(BUILD):
-	mkdir -p $(BUILD)
 
 # Genera la base a partir del volcado SQL. Sólo se rehace si el volcado
 # cambió. No hace falta para las pruebas: ésas crean sus propias bases.

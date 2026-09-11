@@ -8,9 +8,7 @@
 #include <string>
 
 // Crea una base de datos temporal con el mismo esquema que la real, la puebla
-// con los datos que se le den, y la borra al destruirse.
-//
-//
+// con los datos que se le den, y la borra al destruirse.add
 class TempDatabase
 {
 public:

@@ -25,14 +25,13 @@ namespace distance
     // Earth radius in metres, as fixed by the problem statement.
     inline constexpr double kEarthRadius = 6373000.0;
 
-    // Degrees to radians. The coordinates are stored in degrees but the
-    // trigonometric functions work in radians.
+    // Degrees to radians, for the trigonometric function to work
     inline double to_radians(double degrees)
     {
         return degrees * M_PI / 180.0;
     }
 
-    // Natural distance in metres between two points given by latitude/longitude.
+    // Natural distance in metres between two latitude/longitude points.
     inline double natural(double lat1, double lon1, double lat2, double lon2)
     {
         double rlat1 = to_radians(lat1);
@@ -45,9 +44,7 @@ namespace distance
                    std::cos(rlat1) * std::cos(rlat2) * std::sin(dlon / 2) *
                        std::sin(dlon / 2);
 
-        // atan2(sqrt(a), sqrt(1 - a)) is used instead of asin(sqrt(a)): the two
-        // are equal in exact arithmetic, but atan2 is the form given in the
-        // definition and is better behaved near the antipodes.
+        // atan2(sqrt(a), sqrt(1 - a)) is used instead of asin(sqrt(a))
         double c = 2.0 * std::atan2(std::sqrt(a), std::sqrt(1.0 - a));
 
         return kEarthRadius * c;
@@ -59,6 +56,6 @@ namespace distance
         return natural(u.latitude, u.longitude, v.latitude, v.longitude);
     }
 
-} // namespace distance
+}
 
 #endif // DISTANCE_HPP

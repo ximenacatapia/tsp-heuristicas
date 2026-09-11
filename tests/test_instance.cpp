@@ -3,6 +3,7 @@
 #include <vector>
 
 #include "../src/database.hpp"
+#include "../src/distance.hpp"
 #include "lib/doctest.h"
 #include "temp_database.hpp"
 
@@ -28,7 +29,15 @@ namespace
         // The diagonal 2-4 is deliberately missing.
     }
 
-} // namespace
+}
+
+// Haversine distance between two of the toy cities, by original id.
+double d(int id1, int id2)
+{
+    static const double lat[] = {0, 0, 0, 10, 10}; // indexed 1..4
+    static const double lon[] = {0, 0, 10, 10, 0};
+    return distance::natural(lat[id1], lon[id1], lat[id2], lon[id2]);
+}
 
 TEST_CASE("the instance reindexes ids to 0..k-1")
 {
@@ -56,13 +65,13 @@ TEST_CASE("real edges keep their database distance")
 
     // Indices match ids here since they were given in order.
     CHECK(inst.connected(0, 1));
-    CHECK(inst.weight(0, 1) == doctest::Approx(100.0));
+    CHECK(inst.weight(0, 1) == doctest::Approx(d(1, 2)));
 
-    // Symmetry: the edge is undirected.
-    CHECK(inst.weight(1, 0) == doctest::Approx(100.0));
+    // Symmetry.
+    CHECK(inst.weight(1, 0) == doctest::Approx(d(1, 2)));
 
-    CHECK(inst.weight(2, 3) == doctest::Approx(300.0));
-    CHECK(inst.weight(0, 2) == doctest::Approx(500.0)); // the diagonal 1-3
+    CHECK(inst.weight(2, 3) == doctest::Approx(d(3, 4)));
+    CHECK(inst.weight(0, 2) == doctest::Approx(d(1, 3)));
 }
 
 TEST_CASE("a missing edge gets the augmented weight")
@@ -75,8 +84,11 @@ TEST_CASE("a missing edge gets the augmented weight")
     // 2-4 has no real edge (indices 1 and 3).
     CHECK_FALSE(inst.connected(1, 3));
 
-    // Its weight must be natural(2,4) * max_distance, far larger than any real
-    // edge, so the penalty is doing its job.
+    // Its weight must be natural(2,4) * max_distance.
+    double expected = d(2, 4) * inst.max_distance();
+    CHECK(inst.weight(1, 3) == doctest::Approx(expected));
+
+    // And it must exceed max_distance, so the penalty does its job.
     CHECK(inst.weight(1, 3) > inst.max_distance());
 }
 
@@ -87,8 +99,8 @@ TEST_CASE("max_distance is the longest real edge")
     Database db(temp.path());
     Instance inst({1, 2, 3, 4}, db);
 
-    // The heaviest real edge is 1-3 at 500.
-    CHECK(inst.max_distance() == doctest::Approx(500.0));
+    // The heaviest real edge is the diagonal 1-3.
+    CHECK(inst.max_distance() == doctest::Approx(d(1, 3)));
 }
 
 TEST_CASE("the normalizer sums the k-1 heaviest real edges")
@@ -98,8 +110,8 @@ TEST_CASE("the normalizer sums the k-1 heaviest real edges")
     Database db(temp.path());
     Instance inst({1, 2, 3, 4}, db);
 
-    // k = 4, so k-1 = 3 heaviest real edges: 500 + 400 + 300 = 1200.
-    CHECK(inst.normalizer() == doctest::Approx(1200.0));
+    double expected = d(1, 3) + d(1, 2) + d(1, 2);
+    CHECK(inst.normalizer() == doctest::Approx(expected));
 }
 
 TEST_CASE("with fewer than k-1 real edges, all are summed")
@@ -109,14 +121,14 @@ TEST_CASE("with fewer than k-1 real edges, all are summed")
     temp.add_city(2, "B", "X", 100, 0.0, 10.0);
     temp.add_city(3, "C", "X", 100, 10.0, 10.0);
     // Only one real edge among three cities; k-1 would be 2.
-    temp.add_connection(1, 2, 700.0);
+    temp.add_connection(1, 2, 1.0);
 
     Database db(temp.path());
     Instance inst({1, 2, 3}, db);
 
     // Only edge available, so the normalizer is just that one.
-    CHECK(inst.normalizer() == doctest::Approx(700.0));
-    CHECK(inst.max_distance() == doctest::Approx(700.0));
+    CHECK(inst.normalizer() == doctest::Approx(d(1, 2)));
+    CHECK(inst.max_distance() == doctest::Approx(d(1, 2)));
 }
 
 TEST_CASE("an instance with no connected pair throws")
@@ -137,11 +149,12 @@ TEST_CASE("evaluate sums the tour weights over the normalizer")
     Database db(temp.path());
     Instance inst({1, 2, 3, 4}, db);
 
-    // Normalizer is 500 + 400 + 300 = 1200 (checked above).
-    // Tour 0-1-2-3 uses edges 1-2 (100), 2-3 (200), 3-4 (300) = 600.
-    // Cost = 600 / 1200 = 0.5.
+    // Tour 0-1-2-3 uses edges 1-2, 2-3, 3-4, that are all real.
+    double edges = d(1, 2) + d(2, 3) + d(3, 4);
+    double expected = edges / inst.normalizer();
+
     std::vector<std::size_t> tour = {0, 1, 2, 3};
-    CHECK(inst.evaluate(tour) == doctest::Approx(0.5));
+    CHECK(inst.evaluate(tour) == doctest::Approx(expected));
 }
 
 TEST_CASE("a feasible tour scores in [0, 1]")
