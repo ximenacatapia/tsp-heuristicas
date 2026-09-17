@@ -5,13 +5,6 @@
 #include <cstdint>
 #include <random>
 
-// A seeded random-number generator.
-//
-// Wraps std::mt19937 so the rest of the code never touches a global rand():
-// the generator is an object passed where it is needed. The seed is the whole
-// point of the experiments: the same seed reproduces the same run exactly, so
-// a good result found with seed N can be recreated, and thousands of seeds can
-// be compared on equal footing.
 class Random
 {
 public:

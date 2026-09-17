@@ -37,11 +37,10 @@ public:
     // Devuelve cada arista de la tabala en la cual ambos endpoints deben estar en ids
     std::vector<Connection> get_connections(const std::vector<int> &ids) const;
 
-    // Cuántas ciudades hay en total en la base. Sirve para verificar que la
-    // base se cargó completa.
+    // Cuántas ciudades hay en total en la base
     int count_cities() const;
 
-    // Cuántas conexiones hay en total en la base.
+    // Cuántas conexiones hay en total
     int count_connections() const;
 
 private:

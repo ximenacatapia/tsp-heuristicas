@@ -29,11 +29,11 @@ double ThresholdAccepting::accepted_fraction(Solution &s, double t,
         s.random_neighbor(rng);
         if (s.cost() <= before + t)
         {
-            accepted++; // keep the neighbor: s already moved
+            accepted++; // keep the neighbor, s already moved
         }
         else
         {
-            s.undo(); // reject: go back
+            s.undo(); // reject, go back
         }
     }
     return static_cast<double>(accepted) / effective_samples_;
@@ -41,9 +41,7 @@ double ThresholdAccepting::accepted_fraction(Solution &s, double t,
 
 double ThresholdAccepting::initial_temperature(Solution &s, Random &rng) const
 {
-    // Procedure 3: find a bracket [t1, t2] around the target acceptance, then
-    // binary-search inside it. Starting from any T, double it until acceptance
-    // is high enough, or halve it until it is low enough.
+
     double t = 1.0;
     double p = accepted_fraction(s, t, rng);
     const double target = params_.accept_percentage;
@@ -74,8 +72,6 @@ double ThresholdAccepting::initial_temperature(Solution &s, Random &rng) const
         t2 = t * 2.0;
     }
 
-    // Binary search: for a T whose acceptance is within eps of
-    // the target, or until the bracket is narrow enough.
     while (t2 - t1 > eps)
     {
         double mid = (t1 + t2) / 2.0;
@@ -124,8 +120,6 @@ double ThresholdAccepting::compute_batch(Solution &s, double t, Solution &best,
         }
     }
 
-    // Average of the accepted solutions; if none were accepted, report the
-    // current cost so the caller sees no improvement and stops.
     return accepted > 0 ? sum / accepted : s.cost();
 }
 
@@ -139,15 +133,11 @@ Result ThresholdAccepting::run(std::uint64_t seed) const
     double t = initial_temperature(current, rng);
     double settled_t = t;
 
-    // Procedure 2: lower T by phi each step, and at each T repeat batches
-    // while they keep improving (thermal equilibrium).
     while (t > params_.epsilon)
     {
         double previous = std::numeric_limits<double>::infinity();
         double average = compute_batch(current, t, best, rng);
 
-        // Keep running batches at this temperature while the average cost of
-        // the accepted solutions is still decreasing.
         while (average < previous)
         {
             previous = average;

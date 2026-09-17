@@ -1,5 +1,9 @@
 CXX      := g++
-CXXFLAGS := -std=c++17 -Wall -Wextra -pedantic -g
+ifdef DEBUG
+CXXFLAGS := -std=c++17 -Wall -Wextra -pedantic -g -O0
+else
+CXXFLAGS := -std=c++17 -Wall -Wextra -pedantic -O2
+endif
 LDLIBS   := -lsqlite3
 
 BUILD    := build

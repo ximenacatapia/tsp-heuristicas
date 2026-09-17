@@ -36,7 +36,7 @@ namespace
                   << "  --csv        with -r, print one parseable line\n"
                   << "  --csv-header print the CSV header and exit\n"
                   << "  -s N         seed (default 0)\n"
-                  << "  -L N         batch size (default 2000)\n"
+                  << "  -L N         batch size (default 4000)\n"
                   << "  -p F         cooling factor phi (default 0.95)\n"
                   << "  -e F         epsilon (default 0.0001)\n"
                   << "  -P F         target acceptance P (default 0.9)\n"

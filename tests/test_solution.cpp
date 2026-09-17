@@ -12,7 +12,7 @@
 namespace
 {
 
-    // Same toy square as the instance tests, cities 1-4, a ring plus one
+    // Same toy square as the instance tests: cities 1-4, a ring plus one
     // diagonal, so tours can be reasoned about by hand.
     void populate(TempDatabase &db)
     {
@@ -27,7 +27,7 @@ namespace
         db.add_connection(1, 3, 1.0);
     }
 
-}
+} // namespace
 
 TEST_CASE("a random solution is a valid permutation")
 {
@@ -85,7 +85,7 @@ TEST_CASE("a swap changes the tour and updates the cost")
 
 TEST_CASE("undo restores the tour and the cost exactly")
 {
-    // The heuristic relies on, to propose a neighbor, and if it is not
+    // The heuristic relies on this: propose a neighbor, and if it is not
     // accepted, go back to exactly where it was.
     TempDatabase temp("undo");
     populate(temp);
@@ -147,6 +147,59 @@ TEST_CASE("a random neighbor differs in exactly two positions")
     std::vector<std::size_t> sorted = s.tour();
     std::sort(sorted.begin(), sorted.end());
     CHECK(sorted == std::vector<std::size_t>{0, 1, 2, 3});
+}
+
+TEST_CASE("incremental cost matches full re-evaluation")
+{
+    // The incremental swap updates only the affected edges. This must give the
+    // same cost as evaluating the whole tour from scratch, for every kind of
+    // swap: ends, adjacent positions, and interior. Thousands of random swaps
+    // are checked against a fresh evaluate().
+    TempDatabase temp("incremental");
+    populate(temp);
+    Database db(temp.path());
+    Instance inst({1, 2, 3, 4}, db);
+
+    Random rng(2024);
+    Solution s(inst, rng);
+
+    for (int step = 0; step < 5000; ++step)
+    {
+        s.random_neighbor(rng);
+        double fresh = inst.evaluate(s.tour());
+        CHECK(s.cost() == doctest::Approx(fresh).epsilon(1e-6));
+    }
+}
+
+TEST_CASE("incremental cost is correct for adjacent and end swaps")
+{
+    // Explicitly exercise the tricky cases: adjacent positions (shared edge)
+    // and the very ends (fewer edges).
+    TempDatabase temp("incremental_edge");
+    populate(temp);
+    Database db(temp.path());
+    Instance inst({1, 2, 3, 4}, db);
+
+    SUBCASE("adjacent")
+    {
+        Solution s(inst, {0, 1, 2, 3});
+        s.swap_positions(1, 2);
+        CHECK(s.cost() == doctest::Approx(inst.evaluate({0, 2, 1, 3})));
+    }
+
+    SUBCASE("both ends")
+    {
+        Solution s(inst, {0, 1, 2, 3});
+        s.swap_positions(0, 3);
+        CHECK(s.cost() == doctest::Approx(inst.evaluate({3, 1, 2, 0})));
+    }
+
+    SUBCASE("first two")
+    {
+        Solution s(inst, {0, 1, 2, 3});
+        s.swap_positions(0, 1);
+        CHECK(s.cost() == doctest::Approx(inst.evaluate({1, 0, 2, 3})));
+    }
 }
 
 TEST_CASE("a neighbor can be undone back to the original")
