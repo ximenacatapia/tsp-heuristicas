@@ -3,8 +3,10 @@
 
 #include <string>
 
-// Los campos corresponden uno a uno con las columnas de la tabla `cities`.
-// Las coordenadas se guardan en grados (como en la base)
+/*
+ * A city: one row of the `cities` table. Fields map one-to-one to its columns.
+ * Coordinates are stored in degrees, as in the database.
+ */
 struct City
 {
     int id = 0;

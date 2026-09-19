@@ -5,6 +5,11 @@
 #include <cstdint>
 #include <random>
 
+/*
+ * Seeded random-number generator. Wraps std::mt19937 so nothing uses a global
+ * rand(); the same seed reproduces the same run, which is what makes the
+ * experiments reproducible and comparable.
+ */
 class Random
 {
 public:
@@ -16,15 +21,12 @@ public:
         std::uniform_int_distribution<std::size_t> dist(0, n - 1);
         return dist(engine_);
     }
-
-    // A random real in [0, 1). Used where a probability is needed.
     double real()
     {
         std::uniform_real_distribution<double> dist(0.0, 1.0);
         return dist(engine_);
     }
 
-    // The underlying engine, for std::shuffle and the like.
     std::mt19937 &engine() { return engine_; }
 
 private:

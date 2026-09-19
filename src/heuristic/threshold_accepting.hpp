@@ -10,6 +10,10 @@
 #include "random.hpp"
 #include "solution.hpp"
 
+/*
+ * Free parameters of the heuristic. No closed formula exists for them; they
+ * are tuned by experiment.
+ */
 struct Parameters
 {
     std::size_t batch_size = 4000;      // L, accepted solutions per batch
@@ -27,13 +31,14 @@ struct Parameters
     double reheat_fraction = 0.3;  // reset T to this fraction of initial T
 };
 
+/* Why a run ended. */
 enum class StopReason
 {
     kTemperatureReached, // T dropped below epsilon (the normal end)
     kAttemptsExhausted,  // batches kept hitting max_tries without filling
 };
 
-// The outcome of a run, kept together so nothing leaks through globals.
+/* The outcome of a run, kept together so nothing leaks through globals. */
 struct Result
 {
     Solution solution;                    // the best solution found
@@ -51,29 +56,27 @@ struct Result
     StopReason stop_reason = StopReason::kTemperatureReached;
 };
 
+/*
+ * Threshold Accepting: from a random start, repeatedly accept a
+ * neighbor whose cost is within a shrinking threshold T, cooling T by batches
+ * until it reaches epsilon. Returns the best solution seen. Deterministic per
+ * seed.
+ */
 class ThresholdAccepting
 {
 public:
     ThresholdAccepting(const Instance &instance, Parameters params);
 
-    // Runs the heuristic with the given seed and returns the best solution.
-    // Tracing is off by default so ordinary sweeps pay nothing for it.
     Result run(std::uint64_t seed, std::ostream *trace = nullptr) const;
 
-    // Computes an initial temperature by binary search: a T for
-    // which about `accept_percentage` of neighbors are accepted.
     double initial_temperature(Solution &s, Random &rng) const;
 
 private:
-    // Fraction of `percentage_samples` neighbors accepted at temperature T,
-    // starting from s. Leaves s where it ends up.
-    double accepted_fraction(Solution &s, double t, Random &rng) const;
+        double accepted_fraction(Solution &s, double t, Random &rng) const;
 
-    // One batch, keep proposing neighbors until `batch_size` are accepted (or `max_tries` is hit)
     double compute_batch(Solution &s, double t, Solution &best, Random &rng,
                          Result &stats, std::ostream *trace = nullptr) const;
 
-    // When tracing, record one accepted solution out of every kTraceEvery
     static constexpr std::uint64_t kTraceEvery = 1000;
 
     const Instance &instance_;

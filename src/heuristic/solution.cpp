@@ -4,15 +4,16 @@
 #include <numeric>
 #include <stdexcept>
 
+/* Builds a random initial tour and evaluates it once. */
 Solution::Solution(const Instance &instance, Random &rng)
     : instance_(&instance), tour_(instance.size())
 {
-    // Fill with 0, 1, ..., k-1, then shuffle into a random permutation. (the initial tour)
     std::iota(tour_.begin(), tour_.end(), 0);
     std::shuffle(tour_.begin(), tour_.end(), rng.engine());
     cost_ = instance_->evaluate(tour_);
 }
 
+/* Builds a solution from a given tour, checking its length. */
 Solution::Solution(const Instance &instance, std::vector<std::size_t> tour)
     : instance_(&instance), tour_(std::move(tour))
 {
@@ -25,6 +26,7 @@ Solution::Solution(const Instance &instance, std::vector<std::size_t> tour)
     cost_ = instance_->evaluate(tour_);
 }
 
+/* Sum of the augmented weights of the tour edges touching position p. */
 double Solution::edges_around(std::size_t p) const
 {
     double s = 0.0;
@@ -35,9 +37,14 @@ double Solution::edges_around(std::size_t p) const
     return s;
 }
 
+/*
+ * Swaps positions i and j and updates the cost incrementally: only the edges
+ * touching i and j change, so subtract the old ones and add the new. Every
+ * kResyncEvery swaps the cost is recomputed in full to bound floating-point
+ * drift.
+ */
 void Solution::swap_positions(std::size_t i, std::size_t j)
 {
-    // Remember enough to undo: the two positions and the cost before the move.
     last_i_ = i;
     last_j_ = j;
     cost_before_ = cost_;
@@ -48,7 +55,7 @@ void Solution::swap_positions(std::size_t i, std::size_t j)
     if (i > j)
         std::swap(i, j); // ensure i < j to handle adjacency cleanly
 
-    // Old contribution of the edges around both positions.
+    // old contribution of the edges around both positions.
     double removed = edges_around(i) + edges_around(j);
 
     if (j == i + 1)
@@ -60,7 +67,6 @@ void Solution::swap_positions(std::size_t i, std::size_t j)
     if (j == i + 1)
         added -= instance_->weight(tour_[i], tour_[j]);
 
-    // New total = old total - removed + added. cost_ * N recovers the old sum.
     cost_ = (cost_ * N - removed + added) / N;
 
     if (++swaps_since_resync_ >= kResyncEvery)
@@ -70,6 +76,7 @@ void Solution::swap_positions(std::size_t i, std::size_t j)
     }
 }
 
+/* Swaps two random distinct positions. */
 void Solution::random_neighbor(Random &rng)
 {
 
@@ -81,6 +88,7 @@ void Solution::random_neighbor(Random &rng)
     swap_positions(i, j);
 }
 
+/* Reverts the last swap */
 void Solution::undo()
 {
     if (!can_undo_)

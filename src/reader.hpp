@@ -4,11 +4,11 @@
 #include <string>
 #include <vector>
 
-// Lee un archivo .tsp y devuelve los identificadores de ciudades en el orden
-// en que aparecen.
-// Lanzamos std::runtime_error si el archivo no se puede abrir, si no tiene al
-// menos dos ciudades, o si algún identificador aparece repetido (una
-// instancia S es un conjunto de ciudades, así que no admite repeticiones).
+/*
+ * Reads a .tsp file and returns the city ids in the order they appear. Throws
+ * std::runtime_error if the file cannot be opened, holds fewer than two cities,
+ * or repeats an id (an instance S is a set, so it allows no repetitions).
+ */
 std::vector<int> read_instance(const std::string &ruta);
 
 #endif // LECTOR_HPP

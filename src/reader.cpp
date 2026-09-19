@@ -6,6 +6,11 @@
 #include <stdexcept>
 #include <string>
 
+/*
+ * Reads the file whole and pulls out every run of digits as a city id, in
+ * order. Any non-digit is a separator, so commas, spaces or newlines all work.
+ * Rejects repeats, and instances with fewer than two cities.
+ */
 std::vector<int> read_instance(const std::string &path)
 {
     std::ifstream file(path);
@@ -14,15 +19,13 @@ std::vector<int> read_instance(const std::string &path)
         throw std::runtime_error("Couldn't open file:'" + path + "'.");
     }
 
-    // Se lee todo el archivo a memoria.
+    // Read the whole file into memory.
     std::string content((std::istreambuf_iterator<char>(file)),
                         std::istreambuf_iterator<char>());
 
     std::vector<int> ids;
     std::set<int> seen;
 
-    // Se toma cualquier secuencia de dígitos como un identificador y se ignora todo lo demás.
-    // the reader works whether the file has comas, spaces or new lines.
     std::size_t i = 0;
     while (i < content.size())
     {
@@ -32,6 +35,7 @@ std::vector<int> read_instance(const std::string &path)
             continue;
         }
 
+        // Consume all consecutive digits so multi-digit ids stay whole.
         int value = 0;
         while (i < content.size() &&
                std::isdigit(static_cast<unsigned char>(content[i])))

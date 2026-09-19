@@ -7,8 +7,11 @@
 #include "../instance.hpp"
 #include "random.hpp"
 
-// A candidate solution: a tour over the instance, together with its cost.
-
+/*
+ * A candidate solution: a tour (permutation of 0..k-1) and its cached cost.
+ * Neighbors are made by swapping two positions; the swap updates the cost
+ * incrementally and can be undone, which is what the heuristic relies on.
+ */
 class Solution
 {
 public:
@@ -16,7 +19,7 @@ public:
     // tour the heuristic starts from.
     Solution(const Instance &instance, Random &rng);
 
-    // A given tour (mostly for tests). Must be a permutation of 0..k-1.
+    // A given tour, must be a permutation of 0..k-1.
     Solution(const Instance &instance, std::vector<std::size_t> tour);
 
     double cost() const { return cost_; }
@@ -24,22 +27,17 @@ public:
     const std::vector<std::size_t> &tour() const { return tour_; }
     std::size_t size() const { return tour_.size(); }
 
-    // Swaps the values at positions i and j and re-evaluates. The two indices
-    // are remembered so the move can be undone.
     void swap_positions(std::size_t i, std::size_t j);
 
     void random_neighbor(Random &rng);
 
-    // Reverts the last swap_positions / random_neighbor, restoring both the
-    // tour and the cached cost. Only the most recent move can be undone.
     void undo();
 
 private:
     // Sum of the tour edges touching position p (used by the incremental swap).
     double edges_around(std::size_t p) const;
 
-    const Instance *instance_; // pointer, not reference, so Solution can be
-                               // reassigned (best = current in the heuristic)
+    const Instance *instance_;
     std::vector<std::size_t> tour_;
     double cost_ = 0.0;
 

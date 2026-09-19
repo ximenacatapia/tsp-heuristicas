@@ -8,12 +8,16 @@
 #include "city.hpp"
 #include "database.hpp"
 
-/* An instance S of the TSP, ready to be evaluated.
-
- The city ids are sparse (1, 2, 75, 163, ...), so they cannot index an array
- directly. Cities are reindexed to 0..k-1: position i in every internal
- array is the city whose original id is ids_[i]. That original id is kept so
- results can be printed back later. */
+/*
+ * An instance S of the TSP, ready to be evaluated.
+ *
+ * The city ids are sparse (1, 2, 75, 163, ...), so they cannot index an array
+ * directly. Cities are reindexed to 0..k-1: position i in every internal array
+ * is the city whose original id is ids_[i]. That original id is kept so results
+ * can be printed back later. The constructor builds the k x k augmented-weight
+ * matrix and the constants max_distance and normalizer once; evaluating a tour
+ * afterwards is just array lookups.
+ */
 class Instance
 {
 public:

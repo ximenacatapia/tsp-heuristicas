@@ -6,6 +6,7 @@
 
 #include "distance.hpp"
 
+/* Loads the cities, builds the index and the matrix, computes the constants. */
 Instance::Instance(const std::vector<int> &ids, const Database &db)
 {
     // Cities in the order given, index_of_ maps each original id back to its position.
@@ -19,13 +20,18 @@ Instance::Instance(const std::vector<int> &ids, const Database &db)
     compute_max_and_normalizer();
 }
 
+/*
+ * Fills the k x k weight matrix. First the real edges (their natural distance,
+ * marked in real_), then max_distance, then the missing cells with the
+ * augmented weight natural * max_distance. The diagonal stays 0.
+ */
 void Instance::build_matrix(const std::vector<Connection> &connections)
 {
     const std::size_t k = cities_.size();
     matrix_.assign(k * k, 0.0);
     real_.assign(k * k, 0);
 
-    // First round. the real edges from the database (with city1 < city2).
+    //  the real edges from the database (with city1 < city2).
     for (const Connection &e : connections)
     {
         std::size_t i = index_of_.at(e.c1);
@@ -37,8 +43,7 @@ void Instance::build_matrix(const std::vector<Connection> &connections)
         real_[j * k + i] = 1;
     }
 
-    // max_distance is needed to fill the non-real cells, so it is found here,
-    // over the real edges only (definition 4.1.2).
+    // max_distance over the real edges only
     max_distance_ = 0.0;
     for (std::size_t x = 0; x < matrix_.size(); ++x)
     {
@@ -46,8 +51,6 @@ void Instance::build_matrix(const std::vector<Connection> &connections)
             max_distance_ = matrix_[x];
     }
 
-    // Second round: the cells with no real edge get the augmented weight natural(u, v) *
-    // max_distance (definition 4.1.1), a deliberately large, the diagonal stays 0.
     for (std::size_t i = 0; i < k; ++i)
     {
         for (std::size_t j = 0; j < k; ++j)
@@ -60,12 +63,14 @@ void Instance::build_matrix(const std::vector<Connection> &connections)
     }
 }
 
+/*
+ * Computes max_distance and the normalizer N(S): the sum of the k-1 heaviest
+ * real edges (all of them if fewer than k-1). Throws if no edge exists.
+ */
 void Instance::compute_max_and_normalizer()
 {
     const std::size_t k = cities_.size();
 
-    // Collect the real edge weights, upper triangle only so each edge counts
-    // once (the normalizer sums edges, not matrix cells).
     std::vector<double> weights;
     weights.reserve(k * (k - 1) / 2);
     for (std::size_t i = 0; i < k; ++i)
@@ -87,8 +92,6 @@ void Instance::compute_max_and_normalizer()
     // max_distance was already found in build_matrix
     max_distance_ = *std::max_element(weights.begin(), weights.end());
 
-    // N(S): sum of the k-1 heaviest real edges. If there are fewer than k-1,
-    // take them all
     std::size_t take = std::min<std::size_t>(k - 1, weights.size());
     std::partial_sort(weights.begin(), weights.begin() + take, weights.end(),
                       std::greater<double>());
@@ -99,9 +102,9 @@ void Instance::compute_max_and_normalizer()
         normalizer_ += weights[i];
 }
 
+/* Cost of a tour: sum of augmented weights of its edges, over the normalizer. */
 double Instance::evaluate(const std::vector<std::size_t> &tour) const
 {
-    // Sum the augmented weight of each consecutive pair. The tour is a path not a cycle
     double sum = 0.0;
     for (std::size_t i = 1; i < tour.size(); ++i)
     {
@@ -110,9 +113,9 @@ double Instance::evaluate(const std::vector<std::size_t> &tour) const
     return sum / normalizer_;
 }
 
+/* Feasible iff every consecutive pair in the tour is a real edge of E. */
 bool Instance::is_feasible(const std::vector<std::size_t> &tour) const
 {
-    // Feasible iff every consecutive pair is a real edge of E.
     for (std::size_t i = 1; i < tour.size(); ++i)
     {
         if (!connected(tour[i - 1], tour[i]))

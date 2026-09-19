@@ -3,9 +3,9 @@
 #include <stdexcept>
 #include <set>
 
+/* Opens the database read-only; throws if it cannot be opened. */
 Database::Database(const std::string &path)
 {
-    // SQLITE_OPEN_READONLY: nunca escribimos en la base.
     int codigo =
         sqlite3_open_v2(path.c_str(), &db_, SQLITE_OPEN_READONLY, nullptr);
 
@@ -20,12 +20,17 @@ Database::Database(const std::string &path)
     }
 }
 
+/* Closes the connection. */
 Database::~Database()
 {
     if (db_ != nullptr)
         sqlite3_close(db_);
 }
 
+/*
+ * Fetches the given cities in the requested order. Prepares the query once and
+ * reuses it, binding each id; the `?` placeholder avoids SQL injection.
+ */
 std::vector<City> Database::get_cities(
     const std::vector<int> &ids) const
 {
@@ -42,9 +47,6 @@ std::vector<City> Database::get_cities(
     std::vector<City> cities;
     cities.reserve(ids.size());
 
-    // La consulta se prepara UNA vez y se reutiliza ligando un id distinto en
-    // cada vuelta.
-    //`?` placeholder evita problemas de inyección de SQL.
     for (int id : ids)
     {
         sqlite3_reset(stmt);
@@ -60,8 +62,7 @@ std::vector<City> Database::get_cities(
         City c;
         c.id = sqlite3_column_int(stmt, 0);
 
-        // sqlite3_column_text devuelve NULL si la columna es NULL; hay que
-        // revisarlo antes de construir el std::string.
+        // column_text returns NULL for a NULL column; check before building.
         const unsigned char *name = sqlite3_column_text(stmt, 1);
         const unsigned char *country = sqlite3_column_text(stmt, 2);
         c.name = name ? reinterpret_cast<const char *>(name) : "";
@@ -78,8 +79,10 @@ std::vector<City> Database::get_cities(
     return cities;
 }
 
-// Toda la tabla connections se escanea solo una vez y se filtra en memoria
-// we the edges of two enpoints that are both in the instance
+/*
+ * Scans the whole connections table once and keeps the edges whose two
+ * endpoints are both in ids.
+ */
 std::vector<Connection> Database::get_connections(const std::vector<int> &ids) const
 {
     std::set<int> wanted(ids.begin(), ids.end()); // set to ask if the city belong to ids.
@@ -109,7 +112,7 @@ std::vector<Connection> Database::get_connections(const std::vector<int> &ids) c
     return connections;
 }
 
-// Cuenta el total de ciudades en la base.
+/* Counts all cities in the database. */
 int Database::count_cities() const
 {
     sqlite3_stmt *stmt = nullptr;
@@ -128,7 +131,7 @@ int Database::count_cities() const
     return total;
 }
 
-// Cuenta el total de conexiones en la base.
+/* Counts all connections in the database. */
 int Database::count_connections() const
 {
     sqlite3_stmt *stmt = nullptr;

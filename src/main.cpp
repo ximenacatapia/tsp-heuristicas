@@ -17,11 +17,12 @@ namespace
     const char *kDefaultDatabase = "tsp.db";
     const char *kEnvVariable = "TSP_DB";
 
+    /* Everything parsed from the command line for one invocation. */
     struct Options
     {
         std::string tsp_path;
         std::string db_path;
-        std::string save_path; // if set, write the found tour here
+        std::string save_path;
         std::string trace_path;
         bool run = false;
         bool verbose = false;
@@ -30,6 +31,7 @@ namespace
         Parameters params;
     };
 
+    /* Prints the usage message to stderr. */
     void uso(const char *program)
     {
         std::cerr
@@ -55,20 +57,22 @@ namespace
             << ", or TSP_DB)\n";
     }
 
-    // returns the path without its directory
+    /* Returns the path without its directory. */
     std::string base_name(const std::string &path)
     {
         std::size_t slash = path.find_last_of("/\\");
         return (slash == std::string::npos) ? path : path.substr(slash + 1);
     }
 
-    // The CSV columns stay in one column, (may change later)
+    // Column names for the --csv output.
     const char *kCsvHeader =
         "instance,seed,batch_size,cooling,epsilon,accept_percentage,"
         "initial_temperature,cost,feasible";
 
-    // Parses argv into Options. Returns false if the arguments are invalid; sets
-    // `done` to true if the program should exit successfully without running
+    /*
+     * Parses argv into Options. Returns false on bad arguments; sets `done`
+     * when the program should exit successfully without running (--csv-header).
+     */
     bool parse(int argc, char *argv[], Options &opt, bool &done)
     {
         done = false;
@@ -171,6 +175,7 @@ namespace
         }
         opt.tsp_path = positional[0];
 
+        // Database path: -d wins, then TSP_DB, then the default.
         if (opt.db_path.empty())
         {
             const char *from_env = std::getenv(kEnvVariable);
@@ -179,7 +184,7 @@ namespace
         return true;
     }
 
-    // Default mode: evaluate the tour as given in the file.
+    /* Default mode: evaluates and prints the tour as given in the file. */
     void report_file_tour(const Instance &instance, const std::string &tsp_path,
                           const std::vector<int> &ids, bool verbose)
     {
@@ -201,11 +206,10 @@ namespace
         std::printf("Normalizer: %.9f\n", instance.normalizer());
         std::printf("Evaluation: %.9f\n", instance.evaluate(tour));
         std::printf("  Feasible: %s\n", instance.is_feasible(tour) ? "YES" : "NO");
-        (void)verbose; // breakdown omitted here for brevity
+        (void)verbose;
     }
 
-    // Turns a tour (indices 0..k-1) into the comma-separated original ids, the
-    // same format as an input .tsp file.
+    /* Turns a tour of indices into the comma-separated original ids (.tsp form). */
     std::string tour_to_ids(const std::vector<std::size_t> &tour,
                             const std::vector<int> &ids)
     {
@@ -219,7 +223,10 @@ namespace
         return out;
     }
 
-    // -r mode: run the heuristic and report the best solution.
+    /*
+     * -r mode: runs the heuristic and reports the best solution, as a CSV line
+     * (--csv) or a human-readable block, optionally saving the tour and trace.
+     */
     void report_run(const Instance &instance, const Options &opt,
                     const std::vector<int> &ids)
     {
@@ -281,9 +288,7 @@ namespace
                         tour_to_ids(r.solution.tour(), ids).c_str());
         }
 
-        // With --save, write the tour to a file in the same one-line, comma-
-        // separated format as an input .tsp, so it can be re-evaluated or handed
-        // in as the solution.
+        // --save: write the tour in .tsp form so it can be re-evaluated.
         if (!opt.save_path.empty())
         {
             std::ofstream file(opt.save_path);
@@ -301,7 +306,7 @@ namespace
     }
 }
 
-//
+/* Parses arguments, loads the instance, then evaluates or runs the heuristic. */
 int main(int argc, char *argv[])
 {
     Options opt;

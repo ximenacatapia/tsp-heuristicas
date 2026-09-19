@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <limits>
 
+/* Precomputes the effective caps, filling in defaults derived from L. */
 ThresholdAccepting::ThresholdAccepting(const Instance &instance,
                                        Parameters params)
     : instance_(instance), params_(params)
@@ -10,17 +11,15 @@ ThresholdAccepting::ThresholdAccepting(const Instance &instance,
     effective_max_tries_ =
         params_.max_tries != 0 ? params_.max_tries : params_.batch_size * 100;
 
-    // Neighbors sampled to measure the acceptance percentage. Defaults to the
-    // batch size if not set.
     effective_samples_ = params_.percentage_samples != 0
                              ? params_.percentage_samples
                              : params_.batch_size;
 }
 
+/* Samples neighbors at temperature t and returns the fraction accepted. */
 double ThresholdAccepting::accepted_fraction(Solution &s, double t,
                                              Random &rng) const
 {
-    // sample N neighbors and count how many satisfy the accept rule
     std::size_t accepted = 0;
     for (std::size_t i = 0; i < effective_samples_; ++i)
     {
@@ -38,6 +37,10 @@ double ThresholdAccepting::accepted_fraction(Solution &s, double t,
     return static_cast<double>(accepted) / effective_samples_;
 }
 
+/*
+ * Binary-searches a starting temperature that accepts about accept_percentage:
+ * bracket the target by doubling/halving, then bisect.
+ */
 double ThresholdAccepting::initial_temperature(Solution &s, Random &rng) const
 {
 
@@ -89,6 +92,11 @@ double ThresholdAccepting::initial_temperature(Solution &s, Random &rng) const
     return (t1 + t2) / 2.0;
 }
 
+/*
+ * Runs one batch: accepts neighbors under the threshold rule until batch_size
+ * pass or max_tries is hit. Tracks the best seen, accumulates statistics, and
+ * traces accepted costs. Returns the average cost of the accepted solutions.
+ */
 double ThresholdAccepting::compute_batch(Solution &s, double t, Solution &best,
                                          Random &rng, Result &stats,
                                          std::ostream *trace) const
@@ -107,12 +115,10 @@ double ThresholdAccepting::compute_batch(Solution &s, double t, Solution &best,
         {
             accepted++;
             sum += s.cost();
-            // Track the best solution ever seen (the chapter omits this from
-            // the pseudocode but it is what the run must return).
+
             if (s.cost() < best.cost())
                 best = s;
 
-            // record the cost of accepted solutions
             if (trace)
             {
                 stats.accepted_total++;
@@ -133,11 +139,15 @@ double ThresholdAccepting::compute_batch(Solution &s, double t, Solution &best,
     if (accepted < params_.batch_size)
         stats.batches_cut += 1;
 
-    // Average of the accepted solutions; if none were accepted, report the
-    // current cost so the caller sees no improvement and stops.
+    // Average of the accepted solutions
     return accepted > 0 ? sum / accepted : s.cost();
 }
 
+/*
+ * Main loop: run batches at each temperature until they stop improving, cool
+ * by phi, and reheat if the escape clause is on and the best has stalled.
+ * Returns the best solution found.
+ */
 Result ThresholdAccepting::run(std::uint64_t seed, std::ostream *trace) const
 {
     Random rng(seed);
@@ -194,12 +204,12 @@ Result ThresholdAccepting::run(std::uint64_t seed, std::ostream *trace) const
         t *= params_.cooling;
     }
 
+    // Mostly-cut batches mean attempts, not temperature, ended the run.
     if (result.batches_cut > result.batches / 2)
     {
         result.stop_reason = StopReason::kAttemptsExhausted;
     }
 
-    // Fill in the final best solution and its cost/feasibility.
     result.solution = best;
     result.cost = best.cost();
     result.feasible = best.is_feasible();

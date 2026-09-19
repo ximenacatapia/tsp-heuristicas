@@ -5,10 +5,12 @@
 
 #include "city.hpp"
 
-// Natural distance between two cities (definition 4.1.3).
+/*
+ * Natural (great-circle) distance between two cities, definition 4.1.3. Used
+ * for pairs not directly connected in the map. Assumes a spherical Earth.
+ */
 namespace distance
 {
-
     // Earth radius in metres, as fixed by the problem statement.
     inline constexpr double kEarthRadius = 6373000.0;
 
@@ -37,7 +39,7 @@ namespace distance
         return kEarthRadius * c;
     }
 
-    // Convenience overload taking two City objects.
+    // Overload taking two City objects.
     inline double natural(const City &u, const City &v)
     {
         return natural(u.latitude, u.longitude, v.latitude, v.longitude);
