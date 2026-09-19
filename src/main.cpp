@@ -3,6 +3,8 @@
 #include <iostream>
 #include <string>
 #include <vector>
+#include <cstdlib>
+#include <fstream>
 
 #include "instance.hpp"
 #include "reader.hpp"
@@ -19,6 +21,8 @@ namespace
     {
         std::string tsp_path;
         std::string db_path;
+        std::string save_path; // if set, write the found tour here
+        std::string trace_path;
         bool run = false;
         bool verbose = false;
         bool csv = false;
@@ -28,20 +32,27 @@ namespace
 
     void uso(const char *program)
     {
-        std::cerr << "Usage: " << program << " [options] file.tsp\n"
-                  << "\n"
-                  << "  -r           run the heuristic (default: just evaluate the "
-                     "file's tour)\n"
-                  << "  -v           verbose output\n"
-                  << "  --csv        with -r, print one parseable line\n"
-                  << "  --csv-header print the CSV header and exit\n"
-                  << "  -s N         seed (default 0)\n"
-                  << "  -L N         batch size (default 4000)\n"
-                  << "  -p F         cooling factor phi (default 0.95)\n"
-                  << "  -e F         epsilon (default 0.0001)\n"
-                  << "  -P F         target acceptance P (default 0.9)\n"
-                  << "  -d FILE      database (default " << kDefaultDatabase
-                  << ", or TSP_DB)\n";
+        std::cerr
+            << "Usage: " << program << " [options] file.tsp\n"
+            << "\n"
+            << "  -r           run the heuristic (default: just evaluate the "
+               "file's tour)\n"
+            << "  -v           verbose output\n"
+            << "  --csv        with -r, print one parseable line\n"
+            << "  --csv-header print the CSV header and exit\n"
+            << "  -s N         seed (default 0)\n"
+            << "  -L N         batch size (default 2000)\n"
+            << "  -p F         cooling factor phi (default 0.95)\n"
+            << "  -e F         epsilon (default 0.0001)\n"
+            << "  -P F         target acceptance P (default 0.9)\n"
+            << "  --save FILE  write the found tour to FILE\n"
+            << "  --trace FILE write the per-batch cost trace to FILE\n"
+            << "  --stall N    reheat after N batches with no improvement "
+               "(0 = off)\n"
+            << "  --reheats N  max reheats (default 20)\n"
+            << "  --reheat-frac F  reheat to F * initial T (default 0.3)\n"
+            << "  -d FILE      database (default " << kDefaultDatabase
+            << ", or TSP_DB)\n";
     }
 
     // returns the path without its directory
@@ -120,6 +131,29 @@ namespace
             {
                 opt.db_path = next("-d");
             }
+            else if (a == "--save")
+            {
+                opt.save_path = next("--save");
+            }
+            else if (a == "--trace")
+            {
+                opt.trace_path = next("--trace");
+            }
+            else if (a == "--stall")
+            {
+                opt.params.stall_batches =
+                    std::strtoull(next("--stall").c_str(), nullptr, 10);
+            }
+            else if (a == "--reheats")
+            {
+                opt.params.max_reheats =
+                    std::strtoull(next("--reheats").c_str(), nullptr, 10);
+            }
+            else if (a == "--reheat-frac")
+            {
+                opt.params.reheat_fraction =
+                    std::strtod(next("--reheat-frac").c_str(), nullptr);
+            }
             else if (!a.empty() && a[0] == '-')
             {
                 std::cerr << "Error: unknown option '" << a << "'.\n";
@@ -170,23 +204,53 @@ namespace
         (void)verbose; // breakdown omitted here for brevity
     }
 
+    // Turns a tour (indices 0..k-1) into the comma-separated original ids, the
+    // same format as an input .tsp file.
+    std::string tour_to_ids(const std::vector<std::size_t> &tour,
+                            const std::vector<int> &ids)
+    {
+        std::string out;
+        for (std::size_t i = 0; i < tour.size(); ++i)
+        {
+            if (i > 0)
+                out += ',';
+            out += std::to_string(ids[tour[i]]);
+        }
+        return out;
+    }
+
     // -r mode: run the heuristic and report the best solution.
     void report_run(const Instance &instance, const Options &opt,
                     const std::vector<int> &ids)
     {
         ThresholdAccepting ta(instance, opt.params);
-        Result r = ta.run(opt.seed);
+        Result r = [&]
+        {
+            if (!opt.trace_path.empty())
+            {
+                std::ofstream trace(opt.trace_path);
+                if (!trace)
+                {
+                    std::cerr << "Warning: could not write trace to '"
+                              << opt.trace_path << "'.\n";
+                    return ta.run(opt.seed);
+                }
+                return ta.run(opt.seed, &trace);
+            }
+            return ta.run(opt.seed);
+        }();
 
         if (opt.csv)
         {
-            // instance,seed,batch_size,cooling,epsilon,accept_percentage,
-            // initial_temperature,cost,feasible
-            std::printf("%s,%llu,%zu,%g,%g,%g,%.9f,%.9f,%d\n",
+            double rate = r.attempts > 0
+                              ? 100.0 * static_cast<double>(r.accepted) / r.attempts
+                              : 0.0;
+            std::printf("%s,%llu,%zu,%g,%g,%g,%.9f,%.9f,%d,%.2f\n",
                         base_name(opt.tsp_path).c_str(),
                         (unsigned long long)opt.seed, opt.params.batch_size,
                         opt.params.cooling, opt.params.epsilon,
                         opt.params.accept_percentage, r.initial_temperature,
-                        r.cost, r.feasible ? 1 : 0);
+                        r.cost, r.feasible ? 1 : 0, rate);
             return;
         }
 
@@ -196,16 +260,43 @@ namespace
         std::printf("        Cost: %.9f\n", r.cost);
         std::printf("    Feasible: %s\n", r.feasible ? "YES" : "NO");
 
+        double rate = r.attempts > 0
+                          ? 100.0 * static_cast<double>(r.accepted) / r.attempts
+                          : 0.0;
+        std::printf("    Accepted: %.1f%% (%llu of %llu attempts)\n", rate,
+                    (unsigned long long)r.accepted,
+                    (unsigned long long)r.attempts);
+
+        const char *reason =
+            r.stop_reason == StopReason::kAttemptsExhausted
+                ? "ATTEMPTS_EXHAUSTED"
+                : "TEMPERATURE_REACHED";
+        std::printf("     Stopped: %s (%llu batches, %llu cut short)\n", reason,
+                    (unsigned long long)r.batches,
+                    (unsigned long long)r.batches_cut);
+
         if (opt.verbose)
         {
-            std::string path;
-            for (std::size_t i = 0; i < r.solution.tour().size(); ++i)
+            std::printf("        Tour: %s\n",
+                        tour_to_ids(r.solution.tour(), ids).c_str());
+        }
+
+        // With --save, write the tour to a file in the same one-line, comma-
+        // separated format as an input .tsp, so it can be re-evaluated or handed
+        // in as the solution.
+        if (!opt.save_path.empty())
+        {
+            std::ofstream file(opt.save_path);
+            if (!file)
             {
-                if (i > 0)
-                    path += ',';
-                path += std::to_string(ids[r.solution.tour()[i]]);
+                std::cerr << "Warning: could not write to '" << opt.save_path
+                          << "'.\n";
             }
-            std::printf("        Tour: %s\n", path.c_str());
+            else
+            {
+                file << tour_to_ids(r.solution.tour(), ids) << "\n";
+                std::printf("       Saved: %s\n", opt.save_path.c_str());
+            }
         }
     }
 }

@@ -8,16 +8,7 @@
 #include "random.hpp"
 
 // A candidate solution: a tour over the instance, together with its cost.
-//
-// The tour is a permutation of the indices 0..k-1 (definition 4.2: any
-// permutation is a solution on the complete graph G_S). The cost is cached so
-// callers can read it without recomputing.
-//
-// Neighbors (definition 4.4.1) are made by swapping two positions. This class
-// offers a swap-and-remember / undo pair: the heuristic proposes a neighbor,
-// checks its cost, and either keeps it or undoes it. For now the swap simply
-// swaps and re-evaluates the whole tour; a later, faster version can update
-// only the affected edges, without changing this interface.
+
 class Solution
 {
 public:
@@ -37,9 +28,6 @@ public:
     // are remembered so the move can be undone.
     void swap_positions(std::size_t i, std::size_t j);
 
-    // Proposes a random neighbor: picks two distinct positions, swaps them,
-    // re-evaluates. Returns nothing; the change is applied in place and can be
-    // reversed with undo().
     void random_neighbor(Random &rng);
 
     // Reverts the last swap_positions / random_neighbor, restoring both the
@@ -61,8 +49,6 @@ private:
     double cost_before_ = 0.0;
     bool can_undo_ = false;
 
-    // Periodic full recompute to bound floating-point drift from the
-    // incremental updates.
     static constexpr std::size_t kResyncEvery = 10000;
     std::size_t swaps_since_resync_ = 0;
 };

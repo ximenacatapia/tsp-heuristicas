@@ -6,19 +6,6 @@
 #include "city.hpp"
 
 // Natural distance between two cities (definition 4.1.3).
-//
-// This is the great-circle distance: the length of the shortest arc over the
-// surface of a sphere. It is what the problem uses when two cities are NOT
-// directly connected in the map, so a distance still has to be assigned.
-//
-// The formula assumes the Earth is a perfect sphere. It is not, so the result
-// is off by a few kilometres, which the problem statement deliberately
-// ignores. On this database the `connections.distance` column was in fact
-// computed with this same formula, so a real edge and its natural distance
-// agree up to rounding.
-//
-// Kept as a free function, not a method: it depends only on its inputs, has no
-// state, and is trivial to test on its own.
 namespace distance
 {
 

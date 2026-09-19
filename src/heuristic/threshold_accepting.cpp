@@ -20,8 +20,7 @@ ThresholdAccepting::ThresholdAccepting(const Instance &instance,
 double ThresholdAccepting::accepted_fraction(Solution &s, double t,
                                              Random &rng) const
 {
-    // sample N neighbors and count how many satisfy the accept
-    // rule, walking to each accepted one (like a mini run at fixed T).
+    // sample N neighbors and count how many satisfy the accept rule
     std::size_t accepted = 0;
     for (std::size_t i = 0; i < effective_samples_; ++i)
     {
@@ -91,10 +90,8 @@ double ThresholdAccepting::initial_temperature(Solution &s, Random &rng) const
 }
 
 double ThresholdAccepting::compute_batch(Solution &s, double t, Solution &best,
-                                         Random &rng) const
+                                         Random &rng, Result &stats) const
 {
-    // Procedure 1: accept neighbors under the threshold rule until `batch_size`
-    // are accepted, capped by `effective_max_tries_` so it always ends.
     std::size_t accepted = 0;
     std::size_t tries = 0;
     double sum = 0.0;
@@ -120,10 +117,19 @@ double ThresholdAccepting::compute_batch(Solution &s, double t, Solution &best,
         }
     }
 
+    // Accumulate the run-wide statistics.
+    stats.attempts += tries;
+    stats.accepted += accepted;
+    stats.batches += 1;
+    if (accepted < params_.batch_size)
+        stats.batches_cut += 1;
+
+    // Average of the accepted solutions; if none were accepted, report the
+    // current cost so the caller sees no improvement and stops.
     return accepted > 0 ? sum / accepted : s.cost();
 }
 
-Result ThresholdAccepting::run(std::uint64_t seed) const
+Result ThresholdAccepting::run(std::uint64_t seed, std::ostream *trace) const
 {
     Random rng(seed);
 
@@ -133,20 +139,76 @@ Result ThresholdAccepting::run(std::uint64_t seed) const
     double t = initial_temperature(current, rng);
     double settled_t = t;
 
+    Result result{best, best.cost(), best.is_feasible(), settled_t};
+
+    if (trace)
+        *trace << "batch,temperature,current_cost,best_cost\n";
+    std::size_t batch_index = 0;
+
+    // Escape clause , track how long best has gone without improving.
+    double best_before = best.cost();
+    std::size_t stalled = 0;
+
     while (t > params_.epsilon)
     {
         double previous = std::numeric_limits<double>::infinity();
-        double average = compute_batch(current, t, best, rng);
+        double average = compute_batch(current, t, best, rng, result);
+        if (trace)
+        {
+            *trace << batch_index++ << ',' << t << ',' << current.cost() << ','
+                   << best.cost() << '\n';
+        }
 
+        // Keep running batches at this temperature while the average cost of
+        // the accepted solutions is still decreasing.
         while (average < previous)
         {
             previous = average;
-            average = compute_batch(current, t, best, rng);
+            average = compute_batch(current, t, best, rng, result);
+            if (trace)
+            {
+                *trace << batch_index++ << ',' << t << ',' << current.cost()
+                       << ',' << best.cost() << '\n';
+            }
+        }
+
+        // Escape clause: did best improve during this temperature step?
+        if (params_.stall_batches != 0)
+        {
+            if (best.cost() < best_before)
+            {
+                best_before = best.cost(); // progress, reset the stall count
+                stalled = 0;
+            }
+            else
+            {
+                stalled++;
+            }
+
+            // Stalled too long and still allowed to reheat: reset T high again
+            // so the search can escape the local minimum it is stuck in.
+            if (stalled >= params_.stall_batches &&
+                result.reheats < params_.max_reheats)
+            {
+                t = settled_t * params_.reheat_fraction;
+                stalled = 0;
+                result.reheats++;
+                continue; // skip the cooling step for this iteration
+            }
         }
 
         t *= params_.cooling;
     }
 
-    Result result{best, best.cost(), best.is_feasible(), settled_t};
+    // The run ended because the temperature reached epsilon.
+    if (result.batches_cut > result.batches / 2)
+    {
+        result.stop_reason = StopReason::kAttemptsExhausted;
+    }
+
+    // Fill in the final best solution and its cost/feasibility.
+    result.solution = best;
+    result.cost = best.cost();
+    result.feasible = best.is_feasible();
     return result;
 }
