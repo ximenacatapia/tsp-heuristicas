@@ -42,11 +42,12 @@ struct Result
     double initial_temperature = 114688.; // the T the search settled on
 
     // Acceptance statistics over the whole run.
-    std::uint64_t attempts = 0;    // neighbors proposed in total
-    std::uint64_t accepted = 0;    // of those, how many passed the threshold
-    std::uint64_t batches = 0;     // batches computed
-    std::uint64_t batches_cut = 0; // batches that hit max_tries early
-    std::uint64_t reheats = 0;     // times the escape clause fired
+    std::uint64_t attempts = 0;       // neighbors proposed in total
+    std::uint64_t accepted = 0;       // of those, how many passed the threshold
+    std::uint64_t batches = 0;        // batches computed
+    std::uint64_t batches_cut = 0;    // batches that hit max_tries early
+    std::uint64_t reheats = 0;        // times the escape clause fired
+    std::uint64_t accepted_total = 0; // accepted solutions counted for tracing
     StopReason stop_reason = StopReason::kTemperatureReached;
 };
 
@@ -70,7 +71,10 @@ private:
 
     // One batch, keep proposing neighbors until `batch_size` are accepted (or `max_tries` is hit)
     double compute_batch(Solution &s, double t, Solution &best, Random &rng,
-                         Result &stats) const;
+                         Result &stats, std::ostream *trace = nullptr) const;
+
+    // When tracing, record one accepted solution out of every kTraceEvery
+    static constexpr std::uint64_t kTraceEvery = 1000;
 
     const Instance &instance_;
     Parameters params_;

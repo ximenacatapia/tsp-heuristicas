@@ -1,3 +1,17 @@
+#!/usr/bin/env python3
+"""
+Grafica la traza de una corrida: el costo de cada solucion aceptada a lo largo
+de las evaluaciones aceptadas.
+
+Uso:
+    experiments/trace.py <trace.csv> [salida.png]
+
+El archivo de traza se produce con:
+    ./build/tsp-analyzer -r -s SEED --trace trace.csv INSTANCE.tsp
+
+Columnas: accepted, cost.
+"""
+
 import csv
 import sys
 
@@ -8,47 +22,43 @@ import matplotlib.pyplot as plt
 
 def main():
     if len(sys.argv) < 2:
-        print("Usage: plot_trace.py <trace.csv> [output.png]")
+        print("Uso: trace.py <trace.csv> [salida.png]")
         sys.exit(1)
 
     path = sys.argv[1]
     out = sys.argv[2] if len(sys.argv) > 2 else path.replace(".csv", ".png")
 
-    batch, current, best = [], [], []
+    accepted, cost = [], []
     with open(path) as f:
         for row in csv.DictReader(f):
-            batch.append(int(row["batch"]))
-            current.append(float(row["current_cost"]))
-            best.append(float(row["best_cost"]))
+            accepted.append(int(row["accepted"]))
+            cost.append(float(row["cost"]))
 
-    if not batch:
-        print("No data in", path)
+    if not accepted:
+        print("Sin datos en", path)
         sys.exit(1)
 
-    fig, ax = plt.subplots(figsize=(12, 6))
+    final_cost = cost[-1]
 
-    # The saw-tooth: the accepted solution's cost at each batch. It rises when a
-    # worse solution is accepted (within the threshold) and falls when a better
-    # one is found -- the shape that shows the search exploring then settling.
-    ax.plot(batch, current, linewidth=0.6, label="current (accepted)")
-    # The best-so-far never rises.
-    ax.plot(batch, best, linewidth=1.5, label="best so far")
+    fig, ax = plt.subplots(figsize=(10, 6))
 
-    ax.set_xlabel("batch")
-    ax.set_ylabel("cost")
-    ax.set_title("Cost trace over the run")
-    ax.legend()
+    # Una sola curva
+    ax.plot(accepted, cost, linewidth=0.8)
 
-    # The early batches can be enormous (non-feasible, huge penalties), which
-    # squashes the interesting part. A log scale on y keeps both visible.
-    if max(current) > 10 * max(best[len(best) // 2:] or [1]):
-        ax.set_yscale("log")
-        ax.set_ylabel("cost (log scale)")
+    ax.set_xlabel("Evaluaciones aceptadas")
+    ax.set_ylabel("Costo")
+    ax.set_title("Threshold Accepting")
+
+    # Texto con el costo final, se calcula del propio archivo, asi que siempre muestra el valor real de
+    # esta corrida
+    ax.text(0.97, 0.95, f"Costo final: {final_cost:.6f}",
+            transform=ax.transAxes, ha="right", va="top", fontsize=12,
+            bbox=dict(boxstyle="round", facecolor="white", edgecolor="gray"))
 
     fig.tight_layout()
     fig.savefig(out, dpi=120)
-    print("Saved trace plot to", out)
-    print(f"batches: {len(batch)}   final best: {best[-1]:.6f}")
+    print("Grafica guardada en", out)
+    print(f"puntos: {len(accepted)}   costo final: {final_cost:.6f}")
 
 
 if __name__ == "__main__":

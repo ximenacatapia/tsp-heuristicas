@@ -90,7 +90,8 @@ double ThresholdAccepting::initial_temperature(Solution &s, Random &rng) const
 }
 
 double ThresholdAccepting::compute_batch(Solution &s, double t, Solution &best,
-                                         Random &rng, Result &stats) const
+                                         Random &rng, Result &stats,
+                                         std::ostream *trace) const
 {
     std::size_t accepted = 0;
     std::size_t tries = 0;
@@ -110,6 +111,14 @@ double ThresholdAccepting::compute_batch(Solution &s, double t, Solution &best,
             // the pseudocode but it is what the run must return).
             if (s.cost() < best.cost())
                 best = s;
+
+            // record the cost of accepted solutions
+            if (trace)
+            {
+                stats.accepted_total++;
+                if (stats.accepted_total % kTraceEvery == 0)
+                    *trace << stats.accepted_total << ',' << s.cost() << '\n';
+            }
         }
         else
         {
@@ -142,8 +151,7 @@ Result ThresholdAccepting::run(std::uint64_t seed, std::ostream *trace) const
     Result result{best, best.cost(), best.is_feasible(), settled_t};
 
     if (trace)
-        *trace << "batch,temperature,current_cost,best_cost\n";
-    std::size_t batch_index = 0;
+        *trace << "accepted,cost\n";
 
     // Escape clause , track how long best has gone without improving.
     double best_before = best.cost();
@@ -152,24 +160,12 @@ Result ThresholdAccepting::run(std::uint64_t seed, std::ostream *trace) const
     while (t > params_.epsilon)
     {
         double previous = std::numeric_limits<double>::infinity();
-        double average = compute_batch(current, t, best, rng, result);
-        if (trace)
-        {
-            *trace << batch_index++ << ',' << t << ',' << current.cost() << ','
-                   << best.cost() << '\n';
-        }
+        double average = compute_batch(current, t, best, rng, result, trace);
 
-        // Keep running batches at this temperature while the average cost of
-        // the accepted solutions is still decreasing.
         while (average < previous)
         {
             previous = average;
             average = compute_batch(current, t, best, rng, result);
-            if (trace)
-            {
-                *trace << batch_index++ << ',' << t << ',' << current.cost()
-                       << ',' << best.cost() << '\n';
-            }
         }
 
         // Escape clause: did best improve during this temperature step?
@@ -185,8 +181,6 @@ Result ThresholdAccepting::run(std::uint64_t seed, std::ostream *trace) const
                 stalled++;
             }
 
-            // Stalled too long and still allowed to reheat: reset T high again
-            // so the search can escape the local minimum it is stuck in.
             if (stalled >= params_.stall_batches &&
                 result.reheats < params_.max_reheats)
             {
@@ -200,7 +194,6 @@ Result ThresholdAccepting::run(std::uint64_t seed, std::ostream *trace) const
         t *= params_.cooling;
     }
 
-    // The run ended because the temperature reached epsilon.
     if (result.batches_cut > result.batches / 2)
     {
         result.stop_reason = StopReason::kAttemptsExhausted;
